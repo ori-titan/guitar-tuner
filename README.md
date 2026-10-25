@@ -1,5 +1,7 @@
 # Guitar Tuner
 
+<Made with Claude Code> 
+   
 A guitar tuner (standard tuning, Drop D and more) that listens to your microphone and shows how far the nearest string is from being in tune.
 
 **It runs entirely in the browser.** There is no server, no backend, no database and no API keys, just HTML, CSS and JavaScript. This is why it can be hosted on GitHub Pages, which only serves static files and cannot run a backend. Your microphone audio never leaves your device.
