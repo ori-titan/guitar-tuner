@@ -26,8 +26,13 @@
     </section>
     <div class="meter-labels"><span>&flat; flat</span><span>sharp &sharp;</span></div>
 
-    <!-- Kept high on the page so it is reachable without scrolling on small screens. -->
-    <button id="toggle-button" type="button">Start</button>
+    <!-- Kept high on the page so it is reachable without scrolling on small screens.
+         The tuning options are filled in by tuner.js from its TUNINGS table. -->
+    <div class="controls">
+      <label for="tuning-select" class="tuning-label">Tuning</label>
+      <select id="tuning-select"></select>
+      <button id="toggle-button" type="button">Start</button>
+    </div>
 
     <!-- Reference list of the six strings; tuner.js highlights the closest one. -->
     <ul id="string-list" class="string-list"></ul>

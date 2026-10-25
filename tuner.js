@@ -9,20 +9,44 @@
 // Configuration - every tunable value is defined here, once.
 // ---------------------------------------------------------------------------
 
+/** Number of strings on the guitar; every tuning below lists exactly this many notes. */
+const STRING_COUNT = 6;
+
+/** Frequency of the reference note A4, from which every other pitch is computed. */
+const A4_FREQUENCY_HZ = 440;
+
+/** MIDI number of A4. MIDI numbers count semitones, which makes pitch maths simple. */
+const A4_MIDI_NUMBER = 69;
+
+/** Semitones above C within an octave, for each natural note letter. */
+const SEMITONES_ABOVE_C = { C: 0, D: 2, E: 4, F: 5, G: 7, A: 9, B: 11 };
+
+/** Semitone shift of an accidental in a note name: "b" is a flat, "#" a sharp. */
+const ACCIDENTAL_SEMITONES = { b: -1, "": 0, "#": 1 };
+
 /**
- * Open strings of a guitar in standard tuning, lowest to highest.
- * @type {{name: string, frequencyHz: number}[]}
+ * The selectable tunings. Each string is given as a note name (letter, optional
+ * "b" or "#", octave number) and its frequency is computed from that name, so no
+ * frequency is typed twice. Notes run from the lowest string to the highest and
+ * must stay within MIN/MAX_DETECTABLE_FREQUENCY_HZ. To add a tuning, add an entry.
+ *
+ * @type {{id: string, name: string, notes: string[]}[]}
  */
-const STANDARD_TUNING = [
-  { name: "E2", frequencyHz: 82.41 },
-  { name: "A2", frequencyHz: 110.0 },
-  { name: "D3", frequencyHz: 146.83 },
-  { name: "G3", frequencyHz: 196.0 },
-  { name: "B3", frequencyHz: 246.94 },
-  { name: "E4", frequencyHz: 329.63 },
+const TUNINGS = [
+  { id: "standard", name: "Standard", notes: ["E2", "A2", "D3", "G3", "B3", "E4"] },
+  { id: "drop-d", name: "Drop D", notes: ["D2", "A2", "D3", "G3", "B3", "E4"] },
+  { id: "half-step-down", name: "Half step down", notes: ["Eb2", "Ab2", "Db3", "Gb3", "Bb3", "Eb4"] },
+  { id: "dadgad", name: "DADGAD", notes: ["D2", "A2", "D3", "G3", "A3", "D4"] },
+  { id: "open-g", name: "Open G", notes: ["D2", "G2", "D3", "G3", "B3", "D4"] },
 ];
 
-/** Lowest frequency searched for; a bit under the low E (82 Hz) for slack. */
+/** Tuning used on the first visit, or when the remembered choice is no longer valid. */
+const DEFAULT_TUNING_ID = "standard";
+
+/** Browser-storage key under which the chosen tuning's id is remembered. */
+const TUNING_STORAGE_KEY = "guitar-tuner.tuning";
+
+/** Lowest frequency searched for; a bit under the lowest tuned note (D2, 73 Hz) for slack. */
 const MIN_DETECTABLE_FREQUENCY_HZ = 70;
 
 /** Highest frequency searched for; a bit above the high E (330 Hz) for slack. */
@@ -62,11 +86,11 @@ const HOLD_DURATION_MS = 500;
 const SVG_NAMESPACE = "http://www.w3.org/2000/svg";
 
 /** Pegs on each side of the headstock (a 3+3 layout, as on most acoustic guitars). */
-const PEGS_PER_SIDE = STANDARD_TUNING.length / 2;
+const PEGS_PER_SIDE = STRING_COUNT / 2;
 
 /**
  * Layout of the headstock drawing, in SVG units. Everything drawn, including the
- * visible area (viewBox), is derived from these numbers and from STANDARD_TUNING,
+ * visible area (viewBox), is derived from these numbers and from STRING_COUNT,
  * so changing one value here moves the whole drawing.
  */
 const HEADSTOCK_GEOMETRY = {
@@ -150,17 +174,49 @@ function refinePeakLag(correlationByLag, peakLag) {
 }
 
 /**
+ * Converts a note name to its frequency in equal temperament (A4 = 440 Hz).
+ *
+ * @param {string} noteName letter A-G, optional "b" (flat) or "#" (sharp), then
+ *     the octave digit, e.g. "E2", "Bb3"
+ * @returns {number} the frequency in Hz
+ * @throws {Error} if {@code noteName} is not in that format
+ */
+function noteToFrequencyHz(noteName) {
+  const match = /^([A-G])([b#]?)(\d)$/.exec(noteName);
+  if (match === null) throw new Error(`Invalid note name: ${noteName}`);
+  const [, letter, accidental, octave] = match;
+  const midiNumber =
+    12 * (Number(octave) + 1) + SEMITONES_ABOVE_C[letter] + ACCIDENTAL_SEMITONES[accidental];
+  return A4_FREQUENCY_HZ * 2 ** ((midiNumber - A4_MIDI_NUMBER) / 12);
+}
+
+/**
+ * Turns a tuning's note names into strings with target frequencies.
+ *
+ * @param {{notes: string[]}} tuning an entry of TUNINGS
+ * @returns {{name: string, frequencyHz: number}[]} the strings, lowest to highest
+ * @throws {Error} if the tuning does not have exactly STRING_COUNT notes
+ */
+function buildTuningStrings(tuning) {
+  if (tuning.notes.length !== STRING_COUNT) {
+    throw new Error(`A tuning needs ${STRING_COUNT} notes, got ${tuning.notes.length}`);
+  }
+  return tuning.notes.map((name) => ({ name, frequencyHz: noteToFrequencyHz(name) }));
+}
+
+/**
  * Finds the guitar string whose target frequency is closest in pitch.
  * Distance is measured in cents (logarithmic), which matches how we hear.
  *
  * @param {number} frequencyHz a detected frequency, greater than 0
+ * @param {{name: string, frequencyHz: number}[]} strings the strings of the current tuning
  * @returns {{string: {name: string, frequencyHz: number}, index: number, cents: number}}
- *     the closest string, its index in {@code STANDARD_TUNING}, and how many
+ *     the closest string, its index in {@code strings}, and how many
  *     cents {@code frequencyHz} is above (+) or below (-) that string
  */
-function findClosestString(frequencyHz) {
+function findClosestString(frequencyHz, strings) {
   let closest = null;
-  STANDARD_TUNING.forEach((string, index) => {
+  strings.forEach((string, index) => {
     const cents = 1200 * Math.log2(frequencyHz / string.frequencyHz);
     if (closest === null || Math.abs(cents) < Math.abs(closest.cents)) {
       closest = { string, index, cents };
@@ -181,11 +237,11 @@ const stringListElement = document.getElementById("string-list");
 const toggleButton = document.getElementById("toggle-button");
 const headstockElement = document.getElementById("headstock");
 const turnHintElement = document.getElementById("turn-hint");
+const tuningSelectElement = document.getElementById("tuning-select");
 
-/** One list item per string, built from STANDARD_TUNING so names live in one place. */
-const stringItemElements = STANDARD_TUNING.map((string) => {
+/** One list item per string; applyTuning fills in the note names. */
+const stringItemElements = Array.from({ length: STRING_COUNT }, () => {
   const item = document.createElement("li");
-  item.textContent = string.name;
   stringListElement.appendChild(item);
   return item;
 });
@@ -206,19 +262,19 @@ function createSvgElement(tagName, attributes, className) {
 }
 
 /**
- * Draws the headstock into the given SVG: the body, the nut, and for each entry
- * of STANDARD_TUNING a string and a tuning peg. The low strings are on the left
+ * Draws the headstock into the given SVG: the body, the nut, and for each of the
+ * STRING_COUNT strings a string and a tuning peg. The low strings are on the left
  * (bottom to top) and the high strings on the right (top to bottom), so no
- * strings cross - the same as a real 3+3 headstock.
+ * strings cross - the same as a real 3+3 headstock. The peg labels are left
+ * empty; applyTuning fills them in for the selected tuning.
  *
  * @param {SVGElement} svg the (empty) SVG element to draw into
- * @returns {{stringLine: SVGElement, peg: SVGElement}[]} the animatable parts,
- *     in the same order as STANDARD_TUNING
+ * @returns {{stringLine: SVGElement, peg: SVGElement, label: SVGElement}[]} the
+ *     animatable parts and the peg label, lowest string first
  */
 function buildHeadstock(svg) {
   const g = HEADSTOCK_GEOMETRY;
-  const stringCount = STANDARD_TUNING.length;
-  const nutRightX = g.nutLeftX + (stringCount - 1) * g.stringSpacing;
+  const nutRightX = g.nutLeftX + (STRING_COUNT - 1) * g.stringSpacing;
   const topY = g.lowestPegY - (PEGS_PER_SIDE - 1) * g.pegSpacingY - g.topMargin;
 
   // Crop the visible area to the headstock so there is no empty space above it.
@@ -247,9 +303,9 @@ function buildHeadstock(svg) {
     ),
   );
 
-  return STANDARD_TUNING.map((tuning, index) => {
+  return Array.from({ length: STRING_COUNT }, (_, index) => {
     const isLeftSide = index < PEGS_PER_SIDE;
-    const rowFromBottom = isLeftSide ? index : stringCount - 1 - index;
+    const rowFromBottom = isLeftSide ? index : STRING_COUNT - 1 - index;
     const pegY = g.lowestPegY - rowFromBottom * g.pegSpacingY;
     const postX = isLeftSide ? g.pegPostLeftX : g.pegPostRightX;
     const knobX = isLeftSide ? g.pegKnobLeftX : g.pegKnobRightX;
@@ -278,15 +334,14 @@ function buildHeadstock(svg) {
       createSvgElement("rect", { x: -2, y: -g.knobRadius, width: 4, height: 6, rx: 1 }, "peg-tab"),
     );
     const label = createSvgElement("text", { x: 0, y: 3.5 }, "peg-label");
-    label.textContent = tuning.name;
     peg.appendChild(label);
     svg.appendChild(peg);
 
-    return { stringLine, peg };
+    return { stringLine, peg, label };
   });
 }
 
-/** Animatable headstock parts, one entry per string, in STANDARD_TUNING order. */
+/** Animatable headstock parts, one entry per string, lowest string first. */
 const headstockParts = buildHeadstock(headstockElement);
 
 /** CSS classes that renderReading may put on headstock parts; all are cleared on every update. */
@@ -297,7 +352,7 @@ const HEADSTOCK_STATE_CLASSES = ["active", "vibrating", "in-tune", "turn-clockwi
  * direction. On a 3+3 headstock the pegs on the two sides are mirror images:
  * left-side pegs tighten counterclockwise, right-side pegs clockwise.
  *
- * @param {number} stringIndex index of the string in STANDARD_TUNING
+ * @param {number} stringIndex index of the string, 0 being the lowest
  * @param {boolean} needsTightening true if the pitch must go up, false if down
  * @returns {boolean} true if the peg must be turned clockwise, false for counterclockwise
  */
@@ -310,6 +365,9 @@ function isTurnClockwise(stringIndex, needsTightening) {
 let audioContext = null;
 let microphoneStream = null;
 let animationFrameId = null;
+
+/** Strings (name and target frequency) of the selected tuning, lowest first; set by applyTuning. */
+let currentStrings = [];
 
 /**
  * Updates the display for a detected pitch, or resets it when none was found.
@@ -335,7 +393,7 @@ function renderReading(frequencyHz, isLive = true) {
     return;
   }
 
-  const { string, index, cents } = findClosestString(frequencyHz);
+  const { string, index, cents } = findClosestString(frequencyHz, currentStrings);
   const isInTune = Math.abs(cents) <= IN_TUNE_THRESHOLD_CENTS;
   // Clamp so the needle never leaves the meter for wildly off pitches.
   const clampedCents = Math.max(-METER_RANGE_CENTS, Math.min(METER_RANGE_CENTS, cents));
@@ -426,3 +484,75 @@ toggleButton.addEventListener("click", () => {
   if (audioContext === null) startTuner();
   else stopTuner();
 });
+
+/**
+ * Looks up a tuning by id.
+ *
+ * @param {string|null} id a tuning id, possibly missing or outdated (e.g. from storage)
+ * @returns {{id: string, name: string, notes: string[]}} the matching tuning, or the
+ *     default tuning if there is no match
+ */
+function findTuningById(id) {
+  return (
+    TUNINGS.find((tuning) => tuning.id === id) ??
+    TUNINGS.find((tuning) => tuning.id === DEFAULT_TUNING_ID)
+  );
+}
+
+/**
+ * Reads the remembered tuning id. Storage can be blocked (e.g. private browsing),
+ * in which case the default tuning is simply used.
+ *
+ * @returns {string|null} the saved id, or null if nothing could be read
+ */
+function loadSavedTuningId() {
+  try {
+    return localStorage.getItem(TUNING_STORAGE_KEY);
+  } catch (error) {
+    return null;
+  }
+}
+
+/**
+ * Remembers the chosen tuning for the next visit; silently does nothing if
+ * storage is blocked, since the tuner works fine without it.
+ *
+ * @param {string} id the id of the tuning to remember
+ */
+function saveTuningId(id) {
+  try {
+    localStorage.setItem(TUNING_STORAGE_KEY, id);
+  } catch (error) {
+    // Ignored on purpose: not remembering the choice is harmless.
+  }
+}
+
+/**
+ * Switches the tuner to the given tuning: updates the string list, the peg
+ * labels and the selector, and clears the current reading, which belonged to
+ * the previous tuning.
+ *
+ * @param {{id: string, name: string, notes: string[]}} tuning an entry of TUNINGS
+ */
+function applyTuning(tuning) {
+  currentStrings = buildTuningStrings(tuning);
+  currentStrings.forEach((string, index) => {
+    stringItemElements[index].textContent = string.name;
+    headstockParts[index].label.textContent = string.name;
+  });
+  tuningSelectElement.value = tuning.id;
+  if (audioContext !== null) renderReading(-1);
+}
+
+TUNINGS.forEach((tuning) => {
+  const option = document.createElement("option");
+  option.value = tuning.id;
+  option.textContent = tuning.name;
+  tuningSelectElement.appendChild(option);
+});
+tuningSelectElement.addEventListener("change", () => {
+  const tuning = findTuningById(tuningSelectElement.value);
+  applyTuning(tuning);
+  saveTuningId(tuning.id);
+});
+applyTuning(findTuningById(loadSavedTuningId()));

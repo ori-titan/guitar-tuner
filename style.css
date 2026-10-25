@@ -131,7 +131,8 @@ h1 { margin: 0.5rem 0 0; }
   h1 { font-size: 1.4rem; margin-top: 0.25rem; }
   .meter { height: 2rem; margin-top: 0.5rem; }
   .string-list { margin-top: 0.5rem; }
-  button { padding: 0.55rem 2rem; }
+  button { padding: 0.55rem 1.5rem; }
+  select { padding: 0.55rem 0.5rem; }
 }
 
 /* Respect users who ask their system to reduce motion; the arrow and text still show direction. */
@@ -156,9 +157,26 @@ h1 { margin: 0.5rem 0 0; }
 }
 .string-list li.active { background: var(--accent-color); color: white; }
 
-button {
-  align-self: center;
+/* Tuning selector and Start button share one row to save vertical space. */
+.controls {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.6rem;
   margin-top: 0.5rem;
+}
+.tuning-label { color: var(--muted-text-color); }
+/* 16px text keeps iOS Safari from zooming the page when the select is tapped. */
+select {
+  background: var(--surface-color);
+  color: var(--text-color);
+  border: 1px solid var(--muted-text-color);
+  border-radius: 6px;
+  padding: 0.7rem 0.6rem;
+  font-size: 1rem;
+}
+
+button {
   background: var(--accent-color);
   color: white;
   border: none;
