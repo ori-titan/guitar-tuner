@@ -259,6 +259,7 @@ const toggleButton = document.getElementById("toggle-button");
 const headstockElement = document.getElementById("headstock");
 const turnHintElement = document.getElementById("turn-hint");
 const tuningSelectElement = document.getElementById("tuning-select");
+const lockHintElement = document.getElementById("lock-hint");
 
 /** One list item per string; applyTuning fills in the note names. */
 const stringItemElements = Array.from({ length: STRING_COUNT }, () => {
@@ -436,7 +437,7 @@ function renderReading(frequencyHz, isLive = true) {
     statusElement.textContent =
       lockedStringIndex === null
         ? "Play a string..."
-        : `Locked to ${currentStrings[lockedStringIndex].name} - play that string...`;
+        : `Play the ${currentStrings[lockedStringIndex].name} string...`;
     return;
   }
 
@@ -601,9 +602,14 @@ function applyTuning(tuning) {
 
 /**
  * Shows which string (if any) is locked: marks it in the string list and on
- * its peg, and keeps the list items' accessibility state in sync.
+ * its peg, keeps the list items' accessibility state in sync, and shows a line
+ * explaining how to return to automatic mode (empty when nothing is locked).
  */
 function updateLockMarkers() {
+  lockHintElement.textContent =
+    lockedStringIndex === null
+      ? ""
+      : `Locked to ${currentStrings[lockedStringIndex].name} · tap it again for auto mode`;
   stringItemElements.forEach((item, index) => {
     const isLocked = index === lockedStringIndex;
     item.classList.toggle("locked", isLocked);
