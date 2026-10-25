@@ -6,6 +6,8 @@
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>Guitar Tuner</title>
   <link rel="stylesheet" href="style.css">
+  <!-- Applies a remembered dark mode before the page is drawn, so there is no flash of the wood. -->
+  <script src="theme.js"></script>
 </head>
 <body>
   <main>
@@ -59,6 +61,12 @@
   <dialog id="settings-dialog" class="settings-dialog" aria-labelledby="settings-title">
     <div class="settings-content">
       <h2 id="settings-title">Settings</h2>
+
+      <label class="setting-row">
+        <input type="checkbox" id="dark-mode-toggle">
+        <span>Dark mode</span>
+      </label>
+      <p class="settings-note">A plain near-black background instead of the wood: less glare at night or on a dark stage.</p>
 
       <label class="setting-row">
         <input type="checkbox" id="high-accuracy-toggle">

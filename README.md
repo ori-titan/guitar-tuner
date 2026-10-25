@@ -25,7 +25,7 @@ A guitar tuner (standard tuning, Drop D and more) that listens to your microphon
 
 ### Settings and keyboard shortcuts
 
-- **Settings (gear button, top right):** *High accuracy mode* analyses a longer slice of sound (about 170 ms instead of 85 ms). It is more precise, especially for the low strings, but uses about 4x more processing power and battery, reacts a little slower and may stutter on older phones, so a warning is shown in the dialog. The setting is remembered, and takes effect immediately, even while listening.
+- **Settings (gear button, top right):** *Dark mode* swaps the wood for a plain near-black background (less glare at night or on a dark stage); it is remembered. *High accuracy mode* analyses a longer slice of sound (about 170 ms instead of 85 ms). It is more precise, especially for the low strings, but uses about 4x more processing power and battery, reacts a little slower and may stutter on older phones, so a warning is shown in the dialog. The setting is remembered, and takes effect immediately, even while listening.
 - **Keyboard:** press **E**, **A**, **D**, **G** or **B** to lock the string with that note. Press the same key again for the next string with the same note (in standard tuning, **E** locks the low E, then the high E, then goes back to automatic mode). Other tunings follow the same rule (in Drop D, **D** cycles D2 then D3). It works with any keyboard language: Latin layouts use the printed letter, and other scripts such as Hebrew use the key's position, so the key that is E on a US keyboard counts as E. Shortcuts are ignored while the settings dialog is open, when a modifier key (Ctrl, Cmd, Alt) is held, and while a dropdown has focus.
 - **Feedback:** the settings dialog has a link to this project's GitHub Issues page, for bug reports and suggestions (a free GitHub account is needed to post).
 
@@ -56,6 +56,7 @@ A guitar tuner (standard tuning, Drop D and more) that listens to your microphon
 | ---- | ------- |
 | `index.html` | Page structure: note readout, tuning meter, string list and the Start/Stop button. |
 | `style.css` | Wooden guitar-body theme, layout and the string/peg animations. Colours are CSS variables defined once at the top. The wood grain is an inline SVG noise filter inside the CSS (no image files). |
+| `theme.js` | Dark mode and the browser-storage helpers. It is loaded in the page's `<head>` so a remembered dark mode is applied before anything is drawn (no flash of the wood). |
 | `tuner.js` | All the logic: microphone capture, pitch detection, drawing the headstock and updating the display. |
 
 ## How the code works

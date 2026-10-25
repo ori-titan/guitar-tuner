@@ -277,6 +277,7 @@ const settingsButtonElement = document.getElementById("settings-button");
 const settingsDialogElement = document.getElementById("settings-dialog");
 const settingsCloseButtonElement = document.getElementById("settings-close");
 const highAccuracyToggleElement = document.getElementById("high-accuracy-toggle");
+const darkModeToggleElement = document.getElementById("dark-mode-toggle");
 
 /** One list item per string; applyTuning fills in the note names. */
 const stringItemElements = Array.from({ length: STRING_COUNT }, () => {
@@ -623,36 +624,6 @@ function loadSavedTuningId() {
 }
 
 /**
- * Reads a remembered value from the browser's storage. Storage can be blocked
- * (e.g. private browsing), in which case nothing is remembered.
- *
- * @param {string} key the storage key
- * @returns {string|null} the stored value, or null if there is none or storage is blocked
- */
-function readStorage(key) {
-  try {
-    return localStorage.getItem(key);
-  } catch (error) {
-    return null;
-  }
-}
-
-/**
- * Remembers a value in the browser's storage; silently does nothing if storage
- * is blocked, since the tuner works fine without it.
- *
- * @param {string} key the storage key
- * @param {string} value the value to remember
- */
-function writeStorage(key, value) {
-  try {
-    localStorage.setItem(key, value);
-  } catch (error) {
-    // Ignored on purpose: not remembering a choice is harmless.
-  }
-}
-
-/**
  * Remembers the chosen tuning for the next visit; silently does nothing if
  * storage is blocked, since the tuner works fine without it.
  *
@@ -842,3 +813,11 @@ highAccuracyToggleElement.addEventListener("change", () => {
   writeStorage(ACCURACY_STORAGE_KEY, String(isHighAccuracy));
 });
 setHighAccuracy(readStorage(ACCURACY_STORAGE_KEY) === "true");
+
+// Dark mode itself is applied by theme.js before the page is drawn; here the checkbox
+// is set to match it and wired up to change and remember the choice.
+darkModeToggleElement.checked = isDarkMode();
+darkModeToggleElement.addEventListener("change", () => {
+  setDarkMode(darkModeToggleElement.checked);
+  writeStorage(DARK_MODE_STORAGE_KEY, String(darkModeToggleElement.checked));
+});

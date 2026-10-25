@@ -1,7 +1,7 @@
 /* Colors are defined once as variables so changing the theme is a one-line edit. */
 :root {
   /* Wood tones: the page background, the headstock, and the dark inside of the tuning knobs. */
-  --wood-base-color: #3b2217;
+  --page-color: #3b2217;
   --wood-dark-color: #1a0f0a;
   --headstock-color: #5c3a22;
   --headstock-edge-color: #2a170d;
@@ -13,6 +13,7 @@
   --string-color: #cfc6b4;
   /* Translucent dark panels stay readable on top of the wood grain. */
   --surface-color: rgba(20, 11, 7, 0.72);
+  --button-text-color: rgba(20, 11, 7, 0.72);
   --text-color: #f3ebe0;
   --muted-text-color: #c0ae98;
   --accent-color: #4f8cff;
@@ -20,10 +21,25 @@
   --out-of-tune-color: #f0a030;
 }
 
+/* Dark mode (turned on in the settings): a plain near-black page instead of the wood.
+   The dark translucent panels would vanish on black, so they become light translucent;
+   the buttons stay light but dimmer, and the headstock a darker brown. */
+:root[data-theme="dark"] {
+  color-scheme: dark;
+  --page-color: #0b0908;
+  --surface-color: rgba(255, 255, 255, 0.09);
+  --headstock-color: #3a281b;
+  --headstock-edge-color: #17100b;
+  --button-top-color: #e4ded4;
+  --button-bottom-color: #c8c0b4;
+  --button-edge-color: #6c645a;
+}
+:root[data-theme="dark"] body { background-image: none; }
+
 body {
   font-family: system-ui, sans-serif;
   /* Fallback shown for an instant while the wood texture below is drawn. */
-  background-color: var(--wood-base-color);
+  background-color: var(--page-color);
   /* Layers, top to bottom: a dark vignette toward the edges, then the wood texture.
      The texture is an inline SVG that the browser draws itself (no image file) and,
      like real wood, has two layers: fine, straight grain lines and broad, slow bands
@@ -98,6 +114,7 @@ main { position: relative; }
 .setting-row { display: flex; align-items: center; gap: 0.6rem; font-size: 1.05rem; cursor: pointer; }
 .setting-row input { width: 1.25rem; height: 1.25rem; accent-color: var(--accent-color); }
 /* Orange like the other "attention" colour, so the cost of the option is hard to miss. */
+.settings-content .settings-note { color: var(--muted-text-color); font-size: 0.9rem; }
 .settings-content .settings-warning { color: var(--out-of-tune-color); font-size: 0.9rem; }
 kbd {
   display: inline-block;
@@ -116,7 +133,7 @@ h1 { margin: 0.5rem 0 0; }
 
 /* Scales with screen height so the note name shrinks on short screens. */
 .note-name { font-size: clamp(2.5rem, 9vh, 5rem); font-weight: bold; line-height: 1.1; }
-.frequency { color: var(--text-color); font-variant-numeric: tabular-nums; }
+.frequency { color: var(--text-color); font-size: 1.25rem; font-variant-numeric: tabular-nums; }
 
 /* The meter is a track with a fixed centre mark; the needle's `left` is set from JS. */
 .meter {
@@ -152,7 +169,7 @@ h1 { margin: 0.5rem 0 0; }
   display: flex;
   justify-content: space-between;
   color: var(--text-color);
-  font-size: 0.85rem;
+  font-size: 1.05rem;
   margin-top: 0.25rem;
 }
 
@@ -260,7 +277,7 @@ h1 { margin: 0.5rem 0 0; }
 /* The label and the button keep their size; the select (whose natural width is set by its
    longest option, "Half step down") shrinks instead, so the row fits 320px phones. */
 .tuning-label, .controls button { flex: none; }
-.tuning-label { color: var(--text-color); }
+.tuning-label { color: var(--text-color); font-size: 1.15rem; }
 /* Hides keyboard-focus outlines only for mouse/touch clicks, keeping them for keyboard users. */
 .string-list li:focus:not(:focus-visible) { outline: none; }
 /* 16px text keeps iOS Safari from zooming the page when the select is tapped. */
@@ -281,7 +298,7 @@ select option { background: var(--wood-dark-color); color: var(--text-color); }
    top-to-bottom shading, a solid darker edge below (thickness) and a soft shadow (height). */
 button {
   background: linear-gradient(var(--button-top-color), var(--button-bottom-color));
-  color: var(--surface-color);
+  color: var(--button-text-color);
   border: none;
   border-radius: 6px;
   padding: 0.7rem 2rem;
