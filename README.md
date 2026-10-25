@@ -1,6 +1,6 @@
 # Guitar Tuner
 
-<Made with Claude Code> 
+Made with Claude Code.
    
 A guitar tuner (standard tuning, Drop D and more) that listens to your microphone and shows how far the nearest string is from being in tune.
 
