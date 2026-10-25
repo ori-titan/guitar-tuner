@@ -109,6 +109,12 @@ h1 { margin: 0.5rem 0 0; }
 .peg.active.in-tune .peg-knob { stroke: var(--in-tune-color); }
 .peg.active .peg-label, .peg.active .peg-tab { fill: var(--text-color); }
 
+/* Pegs can be tapped to lock the tuner to a string; the hit area is invisible but catches taps. */
+.peg { cursor: pointer; }
+.peg-hit-area { fill: transparent; }
+.peg-lock-ring { fill: none; stroke: var(--text-color); stroke-width: 2; opacity: 0; }
+.peg.locked .peg-lock-ring { opacity: 1; }
+
 /* The arrow is drawn clockwise in tuner.js and mirrored here for counterclockwise turns. */
 .peg-arrow { opacity: 0; color: var(--accent-color); transition: opacity 0.15s; }
 .peg-arrow-line { fill: none; stroke: currentColor; stroke-width: 3; stroke-linecap: round; }
@@ -151,10 +157,14 @@ h1 { margin: 0.5rem 0 0; }
 .string-list li {
   background: var(--surface-color);
   border-radius: 6px;
-  padding: 0.5rem 0.6rem;
+  /* Tall enough (about 44px) to tap comfortably; the border is reserved so locking does not shift the layout. */
+  padding: 0.7rem 0.6rem;
+  border: 2px solid transparent;
   min-width: 2.2rem;
   color: var(--muted-text-color);
+  cursor: pointer;
 }
+.string-list li.locked { border-color: var(--text-color); }
 .string-list li.active { background: var(--accent-color); color: white; }
 
 /* Tuning selector and Start button share one row to save vertical space. */

@@ -82,6 +82,13 @@ const METER_RANGE_CENTS = 50;
  */
 const HOLD_DURATION_MS = 500;
 
+/**
+ * When a string is locked, a pitch further than this from it (in cents; 300 is
+ * a minor third) is treated as "not that string" instead of showing a huge,
+ * meaningless number of cents.
+ */
+const LOCKED_MAX_CENTS_OFF = 300;
+
 /** XML namespace required for creating SVG elements from JavaScript. */
 const SVG_NAMESPACE = "http://www.w3.org/2000/svg";
 
@@ -107,6 +114,8 @@ const HEADSTOCK_GEOMETRY = {
   topMargin: 40, // headstock extends this far above the highest peg
   knobRadius: 13,
   viewBoxPadding: 10, // empty space kept above the headstock inside the visible area
+  pegHitRadius: 24, // invisible tap area around each knob, larger than the knob for fingers
+  lockRingGap: 4, // distance between a knob and the ring that marks a locked string
 };
 
 // ---------------------------------------------------------------------------
@@ -205,6 +214,18 @@ function buildTuningStrings(tuning) {
 }
 
 /**
+ * Measures how far a pitch is from a string's target, in cents (logarithmic,
+ * 100 cents = one semitone), which matches how we hear.
+ *
+ * @param {number} frequencyHz a detected frequency, greater than 0
+ * @param {{frequencyHz: number}} string the string to compare with
+ * @returns {number} cents above (+) or below (-) the string's target
+ */
+function centsFromString(frequencyHz, string) {
+  return 1200 * Math.log2(frequencyHz / string.frequencyHz);
+}
+
+/**
  * Finds the guitar string whose target frequency is closest in pitch.
  * Distance is measured in cents (logarithmic), which matches how we hear.
  *
@@ -217,7 +238,7 @@ function buildTuningStrings(tuning) {
 function findClosestString(frequencyHz, strings) {
   let closest = null;
   strings.forEach((string, index) => {
-    const cents = 1200 * Math.log2(frequencyHz / string.frequencyHz);
+    const cents = centsFromString(frequencyHz, string);
     if (closest === null || Math.abs(cents) < Math.abs(closest.cents)) {
       closest = { string, index, cents };
     }
@@ -323,6 +344,12 @@ function buildHeadstock(svg) {
 
     // The peg group is centred on the knob so rotations and the arrow use (0, 0) as the pivot.
     const peg = createSvgElement("g", { transform: `translate(${knobX} ${pegY})` }, "peg");
+    // Invisible circle larger than the knob, so the peg is easy to tap on a phone.
+    peg.appendChild(createSvgElement("circle", { r: g.pegHitRadius }, "peg-hit-area"));
+    // Ring shown only while this string is locked (see style.css).
+    peg.appendChild(
+      createSvgElement("circle", { r: g.knobRadius + g.lockRingGap }, "peg-lock-ring"),
+    );
     // Arrow arc drawn clockwise; style.css mirrors it for counterclockwise turns.
     const arrow = createSvgElement("g", {}, "peg-arrow");
     arrow.appendChild(createSvgElement("path", { d: "M 0 -22 A 22 22 0 1 1 -22 0" }, "peg-arrow-line"));
@@ -369,6 +396,23 @@ let animationFrameId = null;
 /** Strings (name and target frequency) of the selected tuning, lowest first; set by applyTuning. */
 let currentStrings = [];
 
+/** Index of the string the user locked the tuner to, or null for automatic string detection. */
+let lockedStringIndex = null;
+
+/**
+ * Decides which string a pitch is measured against: the locked string if there
+ * is one, otherwise the closest string of the current tuning.
+ *
+ * @param {number} frequencyHz a detected frequency, greater than 0
+ * @returns {{string: {name: string, frequencyHz: number}, index: number, cents: number}}
+ *     the target string, its index, and the cents {@code frequencyHz} is above (+) or below (-) it
+ */
+function findTargetString(frequencyHz) {
+  if (lockedStringIndex === null) return findClosestString(frequencyHz, currentStrings);
+  const string = currentStrings[lockedStringIndex];
+  return { string, index: lockedStringIndex, cents: centsFromString(frequencyHz, string) };
+}
+
 /**
  * Updates the display for a detected pitch, or resets it when none was found.
  *
@@ -389,11 +433,14 @@ function renderReading(frequencyHz, isLive = true) {
     frequencyElement.textContent = "0.0 Hz";
     needleElement.style.left = "50%";
     needleElement.classList.remove("in-tune");
-    statusElement.textContent = "Play a string...";
+    statusElement.textContent =
+      lockedStringIndex === null
+        ? "Play a string..."
+        : `Locked to ${currentStrings[lockedStringIndex].name} - play that string...`;
     return;
   }
 
-  const { string, index, cents } = findClosestString(frequencyHz, currentStrings);
+  const { string, index, cents } = findTargetString(frequencyHz);
   const isInTune = Math.abs(cents) <= IN_TUNE_THRESHOLD_CENTS;
   // Clamp so the needle never leaves the meter for wildly off pitches.
   const clampedCents = Math.max(-METER_RANGE_CENTS, Math.min(METER_RANGE_CENTS, cents));
@@ -401,6 +448,11 @@ function renderReading(frequencyHz, isLive = true) {
   noteNameElement.textContent = string.name;
   frequencyElement.textContent = `${frequencyHz.toFixed(1)} Hz`;
   needleElement.style.left = `${50 + (clampedCents / METER_RANGE_CENTS) * 50}%`;
+  if (lockedStringIndex !== null && Math.abs(cents) > LOCKED_MAX_CENTS_OFF) {
+    needleElement.classList.remove("in-tune");
+    statusElement.textContent = `Not near ${string.name} - pluck the ${string.name} string`;
+    return;
+  }
   needleElement.classList.toggle("in-tune", isInTune);
   stringItemElements[index].classList.add("active");
 
@@ -541,8 +593,53 @@ function applyTuning(tuning) {
     headstockParts[index].label.textContent = string.name;
   });
   tuningSelectElement.value = tuning.id;
+  // The lock refers to a position in the old tuning, so it no longer means anything.
+  lockedStringIndex = null;
+  updateLockMarkers();
   if (audioContext !== null) renderReading(-1);
 }
+
+/**
+ * Shows which string (if any) is locked: marks it in the string list and on
+ * its peg, and keeps the list items' accessibility state in sync.
+ */
+function updateLockMarkers() {
+  stringItemElements.forEach((item, index) => {
+    const isLocked = index === lockedStringIndex;
+    item.classList.toggle("locked", isLocked);
+    item.setAttribute("aria-pressed", String(isLocked));
+    headstockParts[index].peg.classList.toggle("locked", isLocked);
+  });
+}
+
+/**
+ * Locks the tuner to a string, or unlocks it if that string is already locked.
+ * While locked, pitches are measured against that string only, instead of the
+ * closest one - useful when a string is so far off that it would be mistaken
+ * for its neighbour.
+ *
+ * @param {number} stringIndex index of the tapped string, 0 being the lowest
+ */
+function toggleStringLock(stringIndex) {
+  lockedStringIndex = lockedStringIndex === stringIndex ? null : stringIndex;
+  updateLockMarkers();
+  if (audioContext !== null) renderReading(-1);
+}
+
+// Each string can be tapped in the list or on the headstock. List items are also
+// operable from the keyboard, so they behave like buttons for assistive technology.
+stringItemElements.forEach((item, index) => {
+  item.setAttribute("role", "button");
+  item.setAttribute("tabindex", "0");
+  item.addEventListener("click", () => toggleStringLock(index));
+  item.addEventListener("keydown", (event) => {
+    if (event.key === "Enter" || event.key === " ") {
+      event.preventDefault();
+      toggleStringLock(index);
+    }
+  });
+  headstockParts[index].peg.addEventListener("click", () => toggleStringLock(index));
+});
 
 TUNINGS.forEach((tuning) => {
   const option = document.createElement("option");

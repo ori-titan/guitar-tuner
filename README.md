@@ -18,7 +18,7 @@ A guitar tuner (standard tuning, Drop D and more) that listens to your microphon
    - **Needle**: left of the centre mark means flat, right means sharp.
    - **Status line**: tells you whether to tighten or loosen the string and by how many cents.
    - **Headstock drawing**: the string you played is highlighted and vibrates while it sounds (orange when off, green when in tune). Its tuning peg shows a curved arrow and a turning knob in the direction to turn it, and a text hint says e.g. "Tighten: turn the E2 peg counterclockwise". This assumes a standard 3+3 headstock: left-side pegs tighten counterclockwise, right-side pegs clockwise.
-   - **String list**: the closest string is highlighted.
+   - **String list**: the closest string is highlighted. **Tap a string name** (or its peg on the headstock) to *lock* the tuner to it: the display then measures against that string only and says "Locked to A2". Tap it again to go back to automatic. Locking helps when a string is so far off that the tuner mistakes it for its neighbour. If you play something more than 300 cents from the locked string, it says "Not near A2". Changing the tuning clears the lock.
    - The last reading stays on screen for half a second after the sound stops, so you have time to read it.
 6. Adjust the tuning peg until the needle sits in the centre, turns green and the status says **In tune!** (within ±5 cents).
 7. Press **Stop** when finished. This releases the microphone so the browser's recording indicator turns off.
@@ -72,6 +72,9 @@ Tunings live in the `TUNINGS` table as plain note names (e.g. `"Eb2"`). `noteToF
 
 `findClosestString` then compares the detected frequency with each string of the current tuning using **cents**, a logarithmic unit (100 cents = one semitone): `cents = 1200 * log2(detected / target)`. This matches how we hear pitch. The string with the smallest absolute cents distance wins, and the sign tells flat (negative) or sharp (positive).
 
+### The string lock (`toggleStringLock`)
+`lockedStringIndex` is `null` for automatic mode. `findTargetString` returns either the closest string (`findClosestString`) or the locked one, and both use the same `centsFromString` formula. Taps on the list items and the pegs (which have an invisible, larger hit area for fingers) call `toggleStringLock`; the list items also work from the keyboard (Enter or Space).
+
 ### 5. Updating the display (`renderReading`)
 Sets the note name, frequency, status text and highlighted string, and moves the needle. The needle position is clamped to ±50 cents so it never leaves the meter. With no pitch detected, the display resets.
 
@@ -95,6 +98,7 @@ Every tunable value is defined once, at the top of `tuner.js`:
 | `PEAK_PREFERENCE_RATIO` | How strong a shorter peak must be to be preferred (octave-error protection). |
 | `IN_TUNE_THRESHOLD_CENTS` | Accuracy needed to count as "in tune". |
 | `METER_RANGE_CENTS` | Cents at the far edge of the meter. |
+| `LOCKED_MAX_CENTS_OFF` | With a string locked, pitches further away than this (300 cents) show "Not near ...". |
 | `HOLD_DURATION_MS` | How long the last reading stays after the sound stops. |
 | `HEADSTOCK_GEOMETRY` | Positions and sizes of the headstock drawing. |
 
