@@ -73,13 +73,57 @@ h1 { margin-bottom: 0; }
 
 .status { min-height: 1.5rem; }
 
+/* Headstock drawing: its shapes are created by tuner.js; here they only get styled. */
+.headstock { width: 100%; max-width: 20rem; height: auto; margin-top: 0; }
+.headstock-body { fill: var(--surface-color); stroke: var(--muted-text-color); stroke-width: 2; }
+.headstock-nut { fill: var(--muted-text-color); }
+
+.guitar-string { stroke: var(--muted-text-color); stroke-width: 1.5; }
+.guitar-string.active { stroke: var(--out-of-tune-color); stroke-width: 2.5; }
+.guitar-string.active.in-tune { stroke: var(--in-tune-color); }
+/* Very fast, tiny sideways shake imitates a vibrating string. */
+.guitar-string.vibrating { animation: string-vibrate 0.05s linear infinite alternate; }
+@keyframes string-vibrate {
+  from { transform: translateX(-1.5px); }
+  to { transform: translateX(1.5px); }
+}
+
+.peg-shaft { stroke: var(--muted-text-color); stroke-width: 4; stroke-linecap: round; }
+.peg-knob { fill: var(--background-color); stroke: var(--muted-text-color); stroke-width: 2; }
+.peg-tab { fill: var(--muted-text-color); }
+.peg-label { fill: var(--muted-text-color); font-size: 10px; font-weight: bold; text-anchor: middle; }
+.peg.active .peg-knob { stroke: var(--out-of-tune-color); }
+.peg.active.in-tune .peg-knob { stroke: var(--in-tune-color); }
+.peg.active .peg-label, .peg.active .peg-tab { fill: var(--text-color); }
+
+/* The arrow is drawn clockwise in tuner.js and mirrored here for counterclockwise turns. */
+.peg-arrow { opacity: 0; color: var(--accent-color); transition: opacity 0.15s; }
+.peg-arrow-line { fill: none; stroke: currentColor; stroke-width: 3; stroke-linecap: round; }
+.peg-arrow-head { fill: currentColor; }
+.peg.turn-clockwise .peg-arrow,
+.peg.turn-counterclockwise .peg-arrow { opacity: 1; }
+.peg.turn-counterclockwise .peg-arrow { transform: scaleX(-1); }
+
+/* The knob tab swings 90 degrees in the direction the peg must be turned. */
+.peg.turn-clockwise .peg-tab { animation: peg-turn-clockwise 1.2s ease-in-out infinite; }
+.peg.turn-counterclockwise .peg-tab { animation: peg-turn-counterclockwise 1.2s ease-in-out infinite; }
+@keyframes peg-turn-clockwise { from { transform: rotate(0deg); } to { transform: rotate(90deg); } }
+@keyframes peg-turn-counterclockwise { from { transform: rotate(0deg); } to { transform: rotate(-90deg); } }
+
+.turn-hint { min-height: 1.5rem; margin: 0.25rem 0 0.75rem; color: var(--accent-color); font-weight: bold; }
+
+/* Respect users who ask their system to reduce motion; the arrow and text still show direction. */
+@media (prefers-reduced-motion: reduce) {
+  .guitar-string.vibrating, .peg .peg-tab { animation: none; }
+}
+
 .string-list {
   list-style: none;
   display: flex;
   gap: 0.5rem;
   justify-content: center;
   padding: 0;
-  margin: 1.5rem 0;
+  margin: 1.5rem 0 0.5rem;
 }
 .string-list li {
   background: var(--surface-color);

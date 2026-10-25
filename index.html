@@ -29,6 +29,12 @@
     <!-- Reference list of the six strings; tuner.js highlights the closest one. -->
     <ul id="string-list" class="string-list"></ul>
 
+    <!-- Headstock drawing; tuner.js sets its viewBox and builds the strings and pegs inside it. -->
+    <svg id="headstock" class="headstock" role="img"
+         aria-label="Guitar headstock with six tuning pegs"></svg>
+    <!-- Which way to turn the active peg; filled in by tuner.js. -->
+    <p id="turn-hint" class="turn-hint" aria-live="polite"></p>
+
     <button id="toggle-button" type="button">Start</button>
   </main>
 
