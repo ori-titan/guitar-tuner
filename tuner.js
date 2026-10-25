@@ -29,26 +29,12 @@ const MIN_DETECTABLE_FREQUENCY_HZ = 70;
 const MAX_DETECTABLE_FREQUENCY_HZ = 400;
 
 /**
- * Size of the long analysis window in samples, used only for the lowest notes.
- * Must hold many periods of the lowest note: 8192 samples is ~170 ms at 48 kHz,
- * about 14 periods of 82 Hz. A 4096 window was too short: it made a perfectly
- * tuned low E read ~6 cents flat. Larger windows are more accurate but cost
- * more CPU and react more slowly, so higher notes use SHORT_WINDOW_SIZE instead.
+ * Size of the analysis window in samples. Must hold several periods of the
+ * lowest note: 4096 samples is ~85 ms at 48 kHz, about 7 periods of 82 Hz.
+ * Chosen over larger windows (more accurate for the low E, which reads up to
+ * ~6 cents flat here) because it reacts faster and uses less CPU.
  */
-const FFT_SIZE = 8192;
-
-/**
- * Size of the short analysis window in samples (the newest part of the long
- * one). ~85 ms at 48 kHz: 4x cheaper than the long window and it forgets an old
- * note sooner, which is accurate enough for every string except the low E.
- */
-const SHORT_WINDOW_SIZE = 4096;
-
-/**
- * Pitches below this (between the low E at 82 Hz and the A at 110 Hz), or no
- * pitch at all from the short window, trigger a second look with the long window.
- */
-const LONG_WINDOW_BELOW_HZ = 95;
+const FFT_SIZE = 4096;
 
 /** Signal level (RMS) below which we assume silence and skip detection. */
 const MIN_SIGNAL_RMS = 0.01;
@@ -161,22 +147,6 @@ function refinePeakLag(correlationByLag, peakLag) {
   const curvature = before - 2 * at + after;
   if (curvature === 0) return peakLag;
   return peakLag + (0.5 * (before - after)) / curvature;
-}
-
-/**
- * Estimates the pitch in two stages to balance speed and low-note accuracy:
- * first on the short window (fast, cheap), and only if that finds nothing or a
- * very low pitch, again on the full long window (slower, but accurate for the low E).
- *
- * @param {Float32Array} samples the long window of time-domain samples, newest last
- * @param {number} sampleRate sampling rate of {@code samples} in Hz
- * @returns {number} the frequency in Hz, or -1 if no clear pitch was found
- */
-function detectPitchTwoStageHz(samples, sampleRate) {
-  const newestSamples = samples.subarray(samples.length - SHORT_WINDOW_SIZE);
-  const quickFrequencyHz = detectPitchHz(newestSamples, sampleRate);
-  if (quickFrequencyHz >= LONG_WINDOW_BELOW_HZ) return quickFrequencyHz;
-  return detectPitchHz(samples, sampleRate);
 }
 
 /**
@@ -423,7 +393,7 @@ async function startTuner() {
   let lastDetection = null;
   const analyseFrame = () => {
     analyser.getFloatTimeDomainData(samples);
-    const frequencyHz = detectPitchTwoStageHz(samples, audioContext.sampleRate);
+    const frequencyHz = detectPitchHz(samples, audioContext.sampleRate);
     const nowMs = performance.now();
     if (frequencyHz > 0) {
       lastDetection = { frequencyHz, timeMs: nowMs };

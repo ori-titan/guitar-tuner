@@ -10,7 +10,8 @@
 <body>
   <main>
     <h1>Guitar Tuner</h1>
-    <p class="subtitle">Standard tuning &middot; runs entirely in your browser</p>
+    <!-- Instructions and live feedback (e.g. flat/sharp, errors); filled in by tuner.js. -->
+    <p id="status" class="status">Press Start and play a string.</p>
 
     <!-- The note name and frequency are filled in by tuner.js. -->
     <section class="readout" aria-live="polite">
@@ -24,7 +25,9 @@
       <div id="needle" class="needle"></div>
     </section>
     <div class="meter-labels"><span>&flat; flat</span><span>sharp &sharp;</span></div>
-    <p id="status" class="status">Press Start and play a string.</p>
+
+    <!-- Kept high on the page so it is reachable without scrolling on small screens. -->
+    <button id="toggle-button" type="button">Start</button>
 
     <!-- Reference list of the six strings; tuner.js highlights the closest one. -->
     <ul id="string-list" class="string-list"></ul>
@@ -34,8 +37,6 @@
          aria-label="Guitar headstock with six tuning pegs"></svg>
     <!-- Which way to turn the active peg; filled in by tuner.js. -->
     <p id="turn-hint" class="turn-hint" aria-live="polite"></p>
-
-    <button id="toggle-button" type="button">Start</button>
   </main>
 
   <script src="tuner.js"></script>

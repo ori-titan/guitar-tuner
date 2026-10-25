@@ -14,23 +14,33 @@ body {
   background: var(--background-color);
   color: var(--text-color);
   margin: 0;
-  min-height: 100vh;
+  /* Exactly one screen tall (100vh first as a fallback for browsers without dvh),
+     so the page fits without scrolling; dvh excludes a phone's collapsing address bar. */
+  height: 100vh;
+  height: 100dvh;
   display: flex;
   justify-content: center;
 }
 
-/* Narrow column keeps the tuner readable on both phones and desktops. */
+/* Narrow column keeps the tuner readable on both phones and desktops. It is a
+   vertical flex container so the headstock can take whatever height is left. */
 main {
+  box-sizing: border-box;
   width: 100%;
   max-width: 28rem;
-  padding: 2rem 1rem;
+  height: 100%;
+  padding: 1rem;
   text-align: center;
+  display: flex;
+  flex-direction: column;
 }
+/* Everything keeps its size except the headstock, which is the one flexible item. */
+main > * { flex-shrink: 0; }
 
-h1 { margin-bottom: 0; }
-.subtitle { color: var(--muted-text-color); margin-top: 0.25rem; }
+h1 { margin: 0.5rem 0 0; }
 
-.note-name { font-size: 5rem; font-weight: bold; line-height: 1.1; }
+/* Scales with screen height so the note name shrinks on short screens. */
+.note-name { font-size: clamp(2.5rem, 9vh, 5rem); font-weight: bold; line-height: 1.1; }
 .frequency { color: var(--muted-text-color); font-variant-numeric: tabular-nums; }
 
 /* The meter is a track with a fixed centre mark; the needle's `left` is set from JS. */
@@ -71,10 +81,13 @@ h1 { margin-bottom: 0; }
   margin-top: 0.25rem;
 }
 
-.status { min-height: 1.5rem; }
+/* Reserves two lines so long messages (e.g. the microphone error) do not shift the layout. */
+.status { min-height: 2.4rem; margin: 0.25rem 0; font-size: 0.95rem; }
 
 /* Headstock drawing: its shapes are created by tuner.js; here they only get styled. */
-.headstock { width: 100%; max-width: 20rem; height: auto; margin-top: 0; }
+/* The one flexible item: preferred height 18rem, but it may shrink to the space left on
+   screen (min-height: 0 allows that). The drawing scales to fit inside whatever box results. */
+.headstock { flex: 0 1 18rem; min-height: 0; width: 100%; max-width: 20rem; margin: 0 auto; }
 .headstock-body { fill: var(--surface-color); stroke: var(--muted-text-color); stroke-width: 2; }
 .headstock-nut { fill: var(--muted-text-color); }
 
@@ -112,6 +125,15 @@ h1 { margin-bottom: 0; }
 
 .turn-hint { min-height: 1.5rem; margin: 0.25rem 0 0.75rem; color: var(--accent-color); font-weight: bold; }
 
+/* Phones and short screens: tighter spacing so everything fits without scrolling. */
+@media (max-width: 480px), (max-height: 700px) {
+  main { padding: 0.5rem 1rem; }
+  h1 { font-size: 1.4rem; margin-top: 0.25rem; }
+  .meter { height: 2rem; margin-top: 0.5rem; }
+  .string-list { margin-top: 0.5rem; }
+  button { padding: 0.55rem 2rem; }
+}
+
 /* Respect users who ask their system to reduce motion; the arrow and text still show direction. */
 @media (prefers-reduced-motion: reduce) {
   .guitar-string.vibrating, .peg .peg-tab { animation: none; }
@@ -123,7 +145,7 @@ h1 { margin-bottom: 0; }
   gap: 0.5rem;
   justify-content: center;
   padding: 0;
-  margin: 1.5rem 0 0.5rem;
+  margin: 0.75rem 0 0.25rem;
 }
 .string-list li {
   background: var(--surface-color);
@@ -135,6 +157,8 @@ h1 { margin-bottom: 0; }
 .string-list li.active { background: var(--accent-color); color: white; }
 
 button {
+  align-self: center;
+  margin-top: 0.5rem;
   background: var(--accent-color);
   color: white;
   border: none;

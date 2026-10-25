@@ -53,9 +53,6 @@ The pitch is found with **autocorrelation**: the signal is compared with a delay
 - Only lags corresponding to 70 to 400 Hz are searched, which covers all six strings with some slack.
 - It chooses the **first strong peak** (at least 90% of the best one) rather than the absolute best. A multiple of the true period can correlate slightly better, which would make the tuner report a note an octave too low ("octave error").
 
-### Two-stage analysis (`detectPitchTwoStageHz`)
-A long listening window is accurate for the low E but slow and CPU-heavy. So the newest 4096 samples are analysed first; only if that finds nothing, or a pitch below `LONG_WINDOW_BELOW_HZ`, the full 8192-sample window is analysed too. Most strings therefore get the fast, cheap path, and the low E keeps its accuracy.
-
 ### 3. Sub-sample precision (`refinePeakLag`)
 Lags are whole numbers of samples, which is too coarse for higher notes. A parabola is fitted through the peak and its two neighbours, and its top gives a fractional lag and so a more accurate frequency.
 
@@ -79,9 +76,7 @@ Every tunable value is defined once, at the top of `tuner.js`:
 | -------- | ------- |
 | `STANDARD_TUNING` | Names and target frequencies of the strings. The string list on the page is built from it. |
 | `MIN_DETECTABLE_FREQUENCY_HZ` / `MAX_DETECTABLE_FREQUENCY_HZ` | Frequency range searched. |
-| `FFT_SIZE` | Long analysis window, used only for the lowest notes. 8192 keeps the low E accurate; larger is more accurate but slower. |
-| `SHORT_WINDOW_SIZE` | Short, fast analysis window (4096) used first for every note. |
-| `LONG_WINDOW_BELOW_HZ` | Pitches below this, or no pitch found, are re-analysed with the long window. |
+| `FFT_SIZE` | Number of samples analysed per frame (4096). A larger window makes the low E more accurate but reacts slower and uses more CPU. |
 | `MIN_SIGNAL_RMS` | Level below which input is treated as silence. |
 | `PEAK_PREFERENCE_RATIO` | How strong a shorter peak must be to be preferred (octave-error protection). |
 | `IN_TUNE_THRESHOLD_CENTS` | Accuracy needed to count as "in tune". |
@@ -94,6 +89,7 @@ Colours can be changed in the `:root` block of `style.css`.
 ## Limitations and troubleshooting
 
 - Only **standard tuning** is supported. Other tunings would need a different `STANDARD_TUNING` table and detection range.
+- The 4096-sample listening window favours speed over low-note precision: a perfectly tuned low E can read up to about 6 cents flat. Trust the other strings' readings more, or raise `FFT_SIZE` to 8192 if you prefer accuracy over speed.
 - Play one string at a time in a fairly quiet room. Background noise or ringing neighbouring strings can confuse the detection.
 - **"Microphone unavailable. Allow access and use HTTPS or localhost."**: allow microphone permission for the site, and make sure the page is served over HTTPS or from `localhost`.
 - The needle stays at the centre showing `--`: no clear pitch was found. Play the string louder or closer to the microphone.
