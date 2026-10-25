@@ -1,0 +1,101 @@
+/* Colors are defined once as variables so changing the theme is a one-line edit. */
+:root {
+  --background-color: #14181f;
+  --surface-color: #1e2530;
+  --text-color: #e8ecf1;
+  --muted-text-color: #8b97a8;
+  --accent-color: #4f8cff;
+  --in-tune-color: #34c26b;
+  --out-of-tune-color: #f0a030;
+}
+
+body {
+  font-family: system-ui, sans-serif;
+  background: var(--background-color);
+  color: var(--text-color);
+  margin: 0;
+  min-height: 100vh;
+  display: flex;
+  justify-content: center;
+}
+
+/* Narrow column keeps the tuner readable on both phones and desktops. */
+main {
+  width: 100%;
+  max-width: 28rem;
+  padding: 2rem 1rem;
+  text-align: center;
+}
+
+h1 { margin-bottom: 0; }
+.subtitle { color: var(--muted-text-color); margin-top: 0.25rem; }
+
+.note-name { font-size: 5rem; font-weight: bold; line-height: 1.1; }
+.frequency { color: var(--muted-text-color); font-variant-numeric: tabular-nums; }
+
+/* The meter is a track with a fixed centre mark; the needle's `left` is set from JS. */
+.meter {
+  position: relative;
+  height: 2.5rem;
+  margin-top: 1.5rem;
+  background: var(--surface-color);
+  border-radius: 6px;
+}
+.meter-center {
+  position: absolute;
+  left: 50%;
+  top: 0;
+  bottom: 0;
+  width: 2px;
+  background: var(--muted-text-color);
+}
+.needle {
+  position: absolute;
+  top: 0.25rem;
+  bottom: 0.25rem;
+  left: 50%;
+  width: 6px;
+  margin-left: -3px;
+  border-radius: 3px;
+  background: var(--out-of-tune-color);
+  /* Short transition smooths jitter without making the needle feel laggy. */
+  transition: left 0.08s linear, background-color 0.2s;
+}
+.needle.in-tune { background: var(--in-tune-color); }
+
+.meter-labels {
+  display: flex;
+  justify-content: space-between;
+  color: var(--muted-text-color);
+  font-size: 0.85rem;
+  margin-top: 0.25rem;
+}
+
+.status { min-height: 1.5rem; }
+
+.string-list {
+  list-style: none;
+  display: flex;
+  gap: 0.5rem;
+  justify-content: center;
+  padding: 0;
+  margin: 1.5rem 0;
+}
+.string-list li {
+  background: var(--surface-color);
+  border-radius: 6px;
+  padding: 0.5rem 0.6rem;
+  min-width: 2.2rem;
+  color: var(--muted-text-color);
+}
+.string-list li.active { background: var(--accent-color); color: white; }
+
+button {
+  background: var(--accent-color);
+  color: white;
+  border: none;
+  border-radius: 6px;
+  padding: 0.7rem 2rem;
+  font-size: 1.1rem;
+  cursor: pointer;
+}

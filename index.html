@@ -1,0 +1,37 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <!-- Viewport meta makes the page scale correctly on phones. -->
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Guitar Tuner</title>
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+  <main>
+    <h1>Guitar Tuner</h1>
+    <p class="subtitle">Standard tuning &middot; runs entirely in your browser</p>
+
+    <!-- The note name and frequency are filled in by tuner.js. -->
+    <section class="readout" aria-live="polite">
+      <div id="note-name" class="note-name">--</div>
+      <div id="frequency" class="frequency">0.0 Hz</div>
+    </section>
+
+    <!-- Needle moves left (flat) or right (sharp) of the centre mark. -->
+    <section class="meter" aria-label="Tuning meter">
+      <div class="meter-center"></div>
+      <div id="needle" class="needle"></div>
+    </section>
+    <div class="meter-labels"><span>&flat; flat</span><span>sharp &sharp;</span></div>
+    <p id="status" class="status">Press Start and play a string.</p>
+
+    <!-- Reference list of the six strings; tuner.js highlights the closest one. -->
+    <ul id="string-list" class="string-list"></ul>
+
+    <button id="toggle-button" type="button">Start</button>
+  </main>
+
+  <script src="tuner.js"></script>
+</body>
+</html>
