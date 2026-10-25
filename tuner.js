@@ -55,10 +55,20 @@ const MAX_DETECTABLE_FREQUENCY_HZ = 400;
 /**
  * Size of the analysis window in samples. Must hold several periods of the
  * lowest note: 4096 samples is ~85 ms at 48 kHz, about 7 periods of 82 Hz.
- * Chosen over larger windows (more accurate for the low E, which reads up to
- * ~6 cents flat here) because it reacts faster and uses less CPU.
+ * Chosen as the default over larger windows (more accurate for the low E, which
+ * reads up to ~6 cents flat here) because it reacts faster and uses less CPU.
  */
-const FFT_SIZE = 4096;
+const STANDARD_WINDOW_SIZE = 4096;
+
+/**
+ * Analysis window used when the user turns on high accuracy mode: ~170 ms at
+ * 48 kHz, about 14 periods of 82 Hz. Worst error is ~2.4 cents instead of ~6,
+ * at roughly 4x the CPU cost and a slightly slower reaction.
+ */
+const HIGH_ACCURACY_WINDOW_SIZE = 8192;
+
+/** Browser-storage key under which the high accuracy setting is remembered. */
+const ACCURACY_STORAGE_KEY = "guitar-tuner.high-accuracy";
 
 /** Signal level (RMS) below which we assume silence and skip detection. */
 const MIN_SIGNAL_RMS = 0.01;
@@ -112,9 +122,12 @@ const HEADSTOCK_GEOMETRY = {
   lowestPegY: 200, // vertical position of the peg nearest the nut on each side
   pegSpacingY: 50, // vertical gap between pegs on the same side
   topMargin: 40, // headstock extends this far above the highest peg
-  knobRadius: 13,
+  knobRadius: 16,
+  arrowGap: 9, // distance between a knob and the turn arrow drawn around it
+  tabWidth: 5, // the small tab on the knob rim that visibly turns
+  tabLength: 7,
   viewBoxPadding: 10, // empty space kept above the headstock inside the visible area
-  pegHitRadius: 24, // invisible tap area around each knob, larger than the knob for fingers
+  pegHitRadius: 28, // invisible tap area around each knob, larger than the knob for fingers
   lockRingGap: 4, // distance between a knob and the ring that marks a locked string
 };
 
@@ -260,6 +273,10 @@ const headstockElement = document.getElementById("headstock");
 const turnHintElement = document.getElementById("turn-hint");
 const tuningSelectElement = document.getElementById("tuning-select");
 const lockHintElement = document.getElementById("lock-hint");
+const settingsButtonElement = document.getElementById("settings-button");
+const settingsDialogElement = document.getElementById("settings-dialog");
+const settingsCloseButtonElement = document.getElementById("settings-close");
+const highAccuracyToggleElement = document.getElementById("high-accuracy-toggle");
 
 /** One list item per string; applyTuning fills in the note names. */
 const stringItemElements = Array.from({ length: STRING_COUNT }, () => {
@@ -351,17 +368,41 @@ function buildHeadstock(svg) {
     peg.appendChild(
       createSvgElement("circle", { r: g.knobRadius + g.lockRingGap }, "peg-lock-ring"),
     );
-    // Arrow arc drawn clockwise; style.css mirrors it for counterclockwise turns.
+    // Arrow: a 270-degree arc around the knob, drawn clockwise from the top to the
+    // left, with a head pointing up at its end. style.css mirrors it for counterclockwise turns.
+    const arrowRadius = g.knobRadius + g.arrowGap;
     const arrow = createSvgElement("g", {}, "peg-arrow");
-    arrow.appendChild(createSvgElement("path", { d: "M 0 -22 A 22 22 0 1 1 -22 0" }, "peg-arrow-line"));
-    arrow.appendChild(createSvgElement("polygon", { points: "-22,-7 -28,1 -16,1" }, "peg-arrow-head"));
+    arrow.appendChild(
+      createSvgElement(
+        "path",
+        { d: `M 0 ${-arrowRadius} A ${arrowRadius} ${arrowRadius} 0 1 1 ${-arrowRadius} 0` },
+        "peg-arrow-line",
+      ),
+    );
+    arrow.appendChild(
+      createSvgElement(
+        "polygon",
+        {
+          points:
+            `${-arrowRadius},-8 ` +
+            `${-arrowRadius - 7},1 ` +
+            `${-arrowRadius + 7},1`,
+        },
+        "peg-arrow-head",
+      ),
+    );
     peg.appendChild(arrow);
     peg.appendChild(createSvgElement("circle", { r: g.knobRadius }, "peg-knob"));
     // The small tab on the knob rim is what visibly turns.
     peg.appendChild(
-      createSvgElement("rect", { x: -2, y: -g.knobRadius, width: 4, height: 6, rx: 1 }, "peg-tab"),
+      createSvgElement(
+        "rect",
+        { x: -g.tabWidth / 2, y: -g.knobRadius, width: g.tabWidth, height: g.tabLength, rx: 1 },
+        "peg-tab",
+      ),
     );
-    const label = createSvgElement("text", { x: 0, y: 3.5 }, "peg-label");
+    // dy of 0.35em centres the text vertically whatever font size style.css gives it.
+    const label = createSvgElement("text", { x: 0, y: 0, dy: "0.35em" }, "peg-label");
     peg.appendChild(label);
     svg.appendChild(peg);
 
@@ -399,6 +440,22 @@ let currentStrings = [];
 
 /** Index of the string the user locked the tuner to, or null for automatic string detection. */
 let lockedStringIndex = null;
+
+/** The microphone analyser and its sample buffer while listening; null when stopped. */
+let analyserNode = null;
+let sampleBuffer = null;
+
+/** Whether high accuracy mode (the longer analysis window) is on; set by setHighAccuracy. */
+let isHighAccuracy = false;
+
+/**
+ * Tells how many samples the pitch detector should analyse per frame.
+ *
+ * @returns {number} HIGH_ACCURACY_WINDOW_SIZE in high accuracy mode, otherwise STANDARD_WINDOW_SIZE
+ */
+function getAnalysisWindowSize() {
+  return isHighAccuracy ? HIGH_ACCURACY_WINDOW_SIZE : STANDARD_WINDOW_SIZE;
+}
 
 /**
  * Decides which string a pitch is measured against: the locked string if there
@@ -495,16 +552,17 @@ async function startTuner() {
   }
 
   audioContext = new AudioContext();
-  const analyser = audioContext.createAnalyser();
-  analyser.fftSize = FFT_SIZE;
-  audioContext.createMediaStreamSource(microphoneStream).connect(analyser);
+  analyserNode = audioContext.createAnalyser();
+  analyserNode.fftSize = getAnalysisWindowSize();
+  audioContext.createMediaStreamSource(microphoneStream).connect(analyserNode);
 
-  const samples = new Float32Array(analyser.fftSize);
+  sampleBuffer = new Float32Array(analyserNode.fftSize);
   // Last successful detection, kept so the reading can linger after the sound stops.
   let lastDetection = null;
   const analyseFrame = () => {
-    analyser.getFloatTimeDomainData(samples);
-    const frequencyHz = detectPitchHz(samples, audioContext.sampleRate);
+    // The buffer is re-read every frame because high accuracy mode can replace it while listening.
+    analyserNode.getFloatTimeDomainData(sampleBuffer);
+    const frequencyHz = detectPitchHz(sampleBuffer, audioContext.sampleRate);
     const nowMs = performance.now();
     if (frequencyHz > 0) {
       lastDetection = { frequencyHz, timeMs: nowMs };
@@ -528,6 +586,8 @@ function stopTuner() {
   audioContext.close();
   audioContext = null;
   microphoneStream = null;
+  analyserNode = null;
+  sampleBuffer = null;
   renderReading(-1);
   statusElement.textContent = "Press Start and play a string.";
   toggleButton.textContent = "Start";
@@ -559,10 +619,36 @@ function findTuningById(id) {
  * @returns {string|null} the saved id, or null if nothing could be read
  */
 function loadSavedTuningId() {
+  return readStorage(TUNING_STORAGE_KEY);
+}
+
+/**
+ * Reads a remembered value from the browser's storage. Storage can be blocked
+ * (e.g. private browsing), in which case nothing is remembered.
+ *
+ * @param {string} key the storage key
+ * @returns {string|null} the stored value, or null if there is none or storage is blocked
+ */
+function readStorage(key) {
   try {
-    return localStorage.getItem(TUNING_STORAGE_KEY);
+    return localStorage.getItem(key);
   } catch (error) {
     return null;
+  }
+}
+
+/**
+ * Remembers a value in the browser's storage; silently does nothing if storage
+ * is blocked, since the tuner works fine without it.
+ *
+ * @param {string} key the storage key
+ * @param {string} value the value to remember
+ */
+function writeStorage(key, value) {
+  try {
+    localStorage.setItem(key, value);
+  } catch (error) {
+    // Ignored on purpose: not remembering a choice is harmless.
   }
 }
 
@@ -573,11 +659,7 @@ function loadSavedTuningId() {
  * @param {string} id the id of the tuning to remember
  */
 function saveTuningId(id) {
-  try {
-    localStorage.setItem(TUNING_STORAGE_KEY, id);
-  } catch (error) {
-    // Ignored on purpose: not remembering the choice is harmless.
-  }
+  writeStorage(TUNING_STORAGE_KEY, id);
 }
 
 /**
@@ -627,9 +709,95 @@ function updateLockMarkers() {
  * @param {number} stringIndex index of the tapped string, 0 being the lowest
  */
 function toggleStringLock(stringIndex) {
-  lockedStringIndex = lockedStringIndex === stringIndex ? null : stringIndex;
+  setLockedString(lockedStringIndex === stringIndex ? null : stringIndex);
+}
+
+/**
+ * Sets which string the tuner is locked to and refreshes the display.
+ *
+ * @param {number|null} stringIndex index of the string to lock to, or null for automatic mode
+ */
+function setLockedString(stringIndex) {
+  lockedStringIndex = stringIndex;
   updateLockMarkers();
   if (audioContext !== null) renderReading(-1);
+}
+
+/**
+ * Decides what a letter key does: the next string whose note letter matches.
+ * The first press locks the lowest matching string, each further press moves to
+ * the next matching one (e.g. low E, then high E in standard tuning), and the
+ * press after the last matching string unlocks.
+ *
+ * @param {{name: string}[]} strings the strings of the current tuning, lowest first
+ * @param {string} noteLetter a letter A-G
+ * @param {number|null} currentLockedIndex the currently locked string, or null
+ * @returns {number|null|undefined} the string to lock to, null to unlock, or
+ *     undefined if no string of this tuning has that note letter (key is ignored)
+ */
+function nextLockIndexForLetter(strings, noteLetter, currentLockedIndex) {
+  const matchingIndexes = strings
+    .map((string, index) => index)
+    .filter((index) => strings[index].name[0] === noteLetter);
+  if (matchingIndexes.length === 0) return undefined;
+  const position = matchingIndexes.indexOf(currentLockedIndex);
+  if (position === -1) return matchingIndexes[0];
+  return position + 1 < matchingIndexes.length ? matchingIndexes[position + 1] : null;
+}
+
+/**
+ * Works out which note letter (A-G) a key press stands for, whatever the
+ * keyboard language. On Latin layouts the printed letter is used, so layouts
+ * like AZERTY or Dvorak work as labelled. On other scripts (Hebrew, Russian,
+ * Arabic ...) the printed letter is not A-G, so the key's physical position is
+ * used instead: the key that is E on a US keyboard counts as E.
+ *
+ * @param {KeyboardEvent} event the key press
+ * @returns {string|null} the letter A-G, or null if the key is not a note letter
+ */
+function noteLetterFromKeyEvent(event) {
+  const printed = typeof event.key === "string" && event.key.length === 1 ? event.key.toUpperCase() : "";
+  if (/^[A-G]$/.test(printed)) return printed;
+  const physical = /^Key([A-G])$/.exec(event.code ?? "");
+  return physical === null ? null : physical[1];
+}
+
+/**
+ * Keyboard shortcuts: pressing a note letter locks the matching string (see
+ * nextLockIndexForLetter). Ignored while typing in a form control, while the
+ * settings dialog is open, when a modifier key is held (so browser shortcuts
+ * keep working), and for auto-repeat when a key is held down.
+ *
+ * @param {KeyboardEvent} event the key press
+ */
+function handleKeyDown(event) {
+  if (event.repeat || event.ctrlKey || event.metaKey || event.altKey) return;
+  const targetTag = event.target && event.target.tagName;
+  if (targetTag === "SELECT" || targetTag === "INPUT" || targetTag === "TEXTAREA") return;
+  if (settingsDialogElement.open) return;
+
+  const noteLetter = noteLetterFromKeyEvent(event);
+  if (noteLetter === null) return;
+  const nextIndex = nextLockIndexForLetter(currentStrings, noteLetter, lockedStringIndex);
+  if (nextIndex === undefined) return;
+  setLockedString(nextIndex);
+}
+
+document.addEventListener("keydown", handleKeyDown);
+
+/**
+ * Turns high accuracy mode on or off. If the tuner is listening, the analysis
+ * window is resized on the spot, so there is no need to stop and restart.
+ *
+ * @param {boolean} enabled true for the longer, more accurate window
+ */
+function setHighAccuracy(enabled) {
+  isHighAccuracy = enabled;
+  highAccuracyToggleElement.checked = enabled;
+  if (analyserNode !== null) {
+    analyserNode.fftSize = getAnalysisWindowSize();
+    sampleBuffer = new Float32Array(analyserNode.fftSize);
+  }
 }
 
 // Each string can be tapped in the list or on the headstock. List items are also
@@ -659,3 +827,18 @@ tuningSelectElement.addEventListener("change", () => {
   saveTuningId(tuning.id);
 });
 applyTuning(findTuningById(loadSavedTuningId()));
+
+// Settings dialog: opened with the gear button, closed with its button, Escape
+// (built into <dialog>) or a click on the dark area around it.
+settingsButtonElement.addEventListener("click", () => {
+  if (typeof settingsDialogElement.showModal === "function") settingsDialogElement.showModal();
+});
+settingsCloseButtonElement.addEventListener("click", () => settingsDialogElement.close());
+settingsDialogElement.addEventListener("click", (event) => {
+  if (event.target === settingsDialogElement) settingsDialogElement.close();
+});
+highAccuracyToggleElement.addEventListener("change", () => {
+  setHighAccuracy(highAccuracyToggleElement.checked);
+  writeStorage(ACCURACY_STORAGE_KEY, String(isHighAccuracy));
+});
+setHighAccuracy(readStorage(ACCURACY_STORAGE_KEY) === "true");

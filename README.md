@@ -23,6 +23,12 @@ A guitar tuner (standard tuning, Drop D and more) that listens to your microphon
 6. Adjust the tuning peg until the needle sits in the centre, turns green and the status says **In tune!** (within ±5 cents).
 7. Press **Stop** when finished. This releases the microphone so the browser's recording indicator turns off.
 
+### Settings and keyboard shortcuts
+
+- **Settings (gear button, top right):** *High accuracy mode* analyses a longer slice of sound (about 170 ms instead of 85 ms). It is more precise, especially for the low strings, but uses about 4x more processing power and battery, reacts a little slower and may stutter on older phones, so a warning is shown in the dialog. The setting is remembered, and takes effect immediately, even while listening.
+- **Keyboard:** press **E**, **A**, **D**, **G** or **B** to lock the string with that note. Press the same key again for the next string with the same note (in standard tuning, **E** locks the low E, then the high E, then goes back to automatic mode). Other tunings follow the same rule (in Drop D, **D** cycles D2 then D3). It works with any keyboard language: Latin layouts use the printed letter, and other scripts such as Hebrew use the key's position, so the key that is E on a US keyboard counts as E. Shortcuts are ignored while the settings dialog is open, when a modifier key (Ctrl, Cmd, Alt) is held, and while a dropdown has focus.
+- **Feedback:** the settings dialog has a link to this project's GitHub Issues page, for bug reports and suggestions (a free GitHub account is needed to post).
+
 ### Available tunings
 
 | Tuning | Strings (lowest to highest) |
@@ -49,7 +55,7 @@ A guitar tuner (standard tuning, Drop D and more) that listens to your microphon
 | File | Purpose |
 | ---- | ------- |
 | `index.html` | Page structure: note readout, tuning meter, string list and the Start/Stop button. |
-| `style.css` | Dark theme, layout and the string/peg animations. Colours are CSS variables defined once at the top. |
+| `style.css` | Wooden guitar-body theme, layout and the string/peg animations. Colours are CSS variables defined once at the top. The wood grain is an inline SVG noise filter inside the CSS (no image files). |
 | `tuner.js` | All the logic: microphone capture, pitch detection, drawing the headstock and updating the display. |
 
 ## How the code works
@@ -75,6 +81,9 @@ Tunings live in the `TUNINGS` table as plain note names (e.g. `"Eb2"`). `noteToF
 ### The string lock (`toggleStringLock`)
 `lockedStringIndex` is `null` for automatic mode. `findTargetString` returns either the closest string (`findClosestString`) or the locked one, and both use the same `centsFromString` formula. Taps on the list items and the pegs (which have an invisible, larger hit area for fingers) call `toggleStringLock`; the list items also work from the keyboard (Enter or Space).
 
+### Keyboard and accuracy setting
+`noteLetterFromKeyEvent` turns a key press into a note letter (the printed letter if it is A-G, otherwise the physical key position from `event.code`), and `nextLockIndexForLetter` decides which string to lock, cycling through strings that share the letter. `setHighAccuracy` switches between `STANDARD_WINDOW_SIZE` and `HIGH_ACCURACY_WINDOW_SIZE`; the analyser and its sample buffer are kept in module state, so the window can be resized while listening.
+
 ### 5. Updating the display (`renderReading`)
 Sets the note name, frequency, status text and highlighted string, and moves the needle. The needle position is clamped to ±50 cents so it never leaves the meter. With no pitch detected, the display resets.
 
@@ -93,7 +102,8 @@ Every tunable value is defined once, at the top of `tuner.js`:
 | `TUNINGS` | The selectable tunings, as note names from the lowest to the highest string. To add a tuning, add an entry (all notes must be between the detectable limits below). |
 | `DEFAULT_TUNING_ID` | The tuning used on the first visit. |
 | `MIN_DETECTABLE_FREQUENCY_HZ` / `MAX_DETECTABLE_FREQUENCY_HZ` | Frequency range searched. |
-| `FFT_SIZE` | Number of samples analysed per frame (4096). A larger window makes the low E more accurate but reacts slower and uses more CPU. |
+| `STANDARD_WINDOW_SIZE` | Number of samples analysed per frame by default (4096). A larger window makes the low strings more accurate but reacts slower and uses more CPU. |
+| `HIGH_ACCURACY_WINDOW_SIZE` | The longer window (8192) used when high accuracy mode is on. |
 | `MIN_SIGNAL_RMS` | Level below which input is treated as silence. |
 | `PEAK_PREFERENCE_RATIO` | How strong a shorter peak must be to be preferred (octave-error protection). |
 | `IN_TUNE_THRESHOLD_CENTS` | Accuracy needed to count as "in tune". |
@@ -107,7 +117,7 @@ Colours can be changed in the `:root` block of `style.css`.
 ## Limitations and troubleshooting
 
 - Only the tunings in the `TUNINGS` table are available, and their notes must lie within the detection range (70 to 400 Hz). Very low tunings such as Drop C need `MIN_DETECTABLE_FREQUENCY_HZ` lowered first.
-- The 4096-sample listening window favours speed over low-note precision: a perfectly tuned low E can read up to about 6 cents flat. Trust the other strings' readings more, or raise `FFT_SIZE` to 8192 if you prefer accuracy over speed.
+- The 4096-sample listening window favours speed over low-note precision: a perfectly tuned low E can read up to about 6 cents flat. Trust the other strings' readings more, or turn on **High accuracy mode** in the settings (gear button), which brings the worst error down to about 2 cents at the cost of more CPU and a slightly slower reaction.
 - Play one string at a time in a fairly quiet room. Background noise or ringing neighbouring strings can confuse the detection.
 - **"Microphone unavailable. Allow access and use HTTPS or localhost."**: allow microphone permission for the site, and make sure the page is served over HTTPS or from `localhost`.
 - The needle stays at the centre showing `--`: no clear pitch was found. Play the string louder or closer to the microphone.

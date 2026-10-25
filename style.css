@@ -1,9 +1,20 @@
 /* Colors are defined once as variables so changing the theme is a one-line edit. */
 :root {
-  --background-color: #14181f;
-  --surface-color: #1e2530;
-  --text-color: #e8ecf1;
-  --muted-text-color: #8b97a8;
+  /* Wood tones: the page background, the headstock, and the dark inside of the tuning knobs. */
+  --wood-base-color: #3b2217;
+  --wood-dark-color: #1a0f0a;
+  --headstock-color: #5c3a22;
+  --headstock-edge-color: #2a170d;
+  --nut-color: #e6dcc6;
+  /* Raised white buttons: a light gradient, and a darker edge that gives them thickness. */
+  --button-top-color: #ffffff;
+  --button-bottom-color: #e8e1d6;
+  --button-edge-color: #b7ab9a;
+  --string-color: #cfc6b4;
+  /* Translucent dark panels stay readable on top of the wood grain. */
+  --surface-color: rgba(20, 11, 7, 0.72);
+  --text-color: #f3ebe0;
+  --muted-text-color: #c0ae98;
   --accent-color: #4f8cff;
   --in-tune-color: #34c26b;
   --out-of-tune-color: #f0a030;
@@ -11,7 +22,20 @@
 
 body {
   font-family: system-ui, sans-serif;
-  background: var(--background-color);
+  /* Fallback shown for an instant while the wood texture below is drawn. */
+  background-color: var(--wood-base-color);
+  /* Layers, top to bottom: a dark vignette toward the edges, then the wood texture.
+     The texture is an inline SVG that the browser draws itself (no image file) and,
+     like real wood, has two layers: fine, straight grain lines and broad, slow bands
+     of lighter and darker wood, bent only slightly. Edit the values in the SVG to
+     change it: the first baseFrequency x = width of the broad bands, the second =
+     fineness of the grain lines and its y value = their length (smaller is longer; the
+     extra octaves mix in shorter strands, so the length varies), displacement scale =
+     waviness, and the colour matrix = brightness and tint. */
+  background-image:
+    radial-gradient(ellipse at center, transparent 45%, rgba(0, 0, 0, 0.5) 100%),
+    url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='1000' height='1000'%3E%3Cfilter id='f'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.012 0.0018' numOctaves='3' seed='7' result='broad'/%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.05 0.001' numOctaves='4' seed='3' result='fine'/%3E%3CfeComposite in='broad' in2='fine' operator='arithmetic' k1='0' k2='0.4' k3='1.0' k4='0' result='mix'/%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.004 0.0025' numOctaves='2' seed='12' result='waves'/%3E%3CfeDisplacementMap in='mix' in2='waves' scale='8' xChannelSelector='R' yChannelSelector='G' result='bent'/%3E%3CfeColorMatrix in='bent' type='matrix' values='0.62 0 0 0 -0.03  0.32 0 0 0 -0.016  0.17 0 0 0 -0.009  0 0 0 0 1'/%3E%3C/filter%3E%3Crect x='-150' y='-150' width='1300' height='1300' filter='url(%23f)'/%3E%3C/svg%3E");
+  background-size: cover;
   color: var(--text-color);
   margin: 0;
   /* Exactly one screen tall (100vh first as a fallback for browsers without dvh),
@@ -37,11 +61,62 @@ main {
 /* Everything keeps its size except the headstock, which is the one flexible item. */
 main > * { flex-shrink: 0; }
 
+/* The gear sits in the top-right corner of the column and takes no layout space.
+   (Its .settings-button class beats the general `button` rule below.) */
+main { position: relative; }
+.settings-button {
+  position: absolute;
+  top: 0.5rem;
+  right: 0.5rem;
+  width: 2.75rem;
+  height: 2.75rem;
+  padding: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: none;
+  color: var(--text-color);
+  box-shadow: none;
+}
+.settings-button:active { transform: none; background: none; box-shadow: none; opacity: 0.6; }
+.settings-button svg { filter: drop-shadow(0 1px 2px rgba(0, 0, 0, 0.7)); }
+
+/* Settings dialog; its backdrop is the page behind, dimmed. */
+.settings-dialog {
+  padding: 0;
+  max-width: min(24rem, calc(100vw - 2rem));
+  border: 1px solid var(--muted-text-color);
+  border-radius: 10px;
+  background: var(--wood-dark-color);
+  color: var(--text-color);
+}
+.settings-dialog::backdrop { background: rgba(0, 0, 0, 0.65); }
+.settings-content { padding: 1rem 1.25rem 1.25rem; }
+.settings-content h2 { margin: 0 0 0.75rem; }
+.settings-content h3 { margin: 1rem 0 0.25rem; font-size: 1rem; }
+.settings-content p { margin: 0.5rem 0 0; line-height: 1.4; }
+.setting-row { display: flex; align-items: center; gap: 0.6rem; font-size: 1.05rem; cursor: pointer; }
+.setting-row input { width: 1.25rem; height: 1.25rem; accent-color: var(--accent-color); }
+/* Orange like the other "attention" colour, so the cost of the option is hard to miss. */
+.settings-content .settings-warning { color: var(--out-of-tune-color); font-size: 0.9rem; }
+kbd {
+  display: inline-block;
+  min-width: 1.2rem;
+  padding: 0.05rem 0.35rem;
+  border: 1px solid var(--muted-text-color);
+  border-radius: 4px;
+  text-align: center;
+  font-family: inherit;
+  font-size: 0.9rem;
+}
+.settings-content a { color: var(--accent-color); }
+.settings-content button { margin-top: 1rem; }
+
 h1 { margin: 0.5rem 0 0; }
 
 /* Scales with screen height so the note name shrinks on short screens. */
 .note-name { font-size: clamp(2.5rem, 9vh, 5rem); font-weight: bold; line-height: 1.1; }
-.frequency { color: var(--muted-text-color); font-variant-numeric: tabular-nums; }
+.frequency { color: var(--text-color); font-variant-numeric: tabular-nums; }
 
 /* The meter is a track with a fixed centre mark; the needle's `left` is set from JS. */
 .meter {
@@ -76,7 +151,7 @@ h1 { margin: 0.5rem 0 0; }
 .meter-labels {
   display: flex;
   justify-content: space-between;
-  color: var(--muted-text-color);
+  color: var(--text-color);
   font-size: 0.85rem;
   margin-top: 0.25rem;
 }
@@ -88,10 +163,10 @@ h1 { margin: 0.5rem 0 0; }
 /* The one flexible item: preferred height 18rem, but it may shrink to the space left on
    screen (min-height: 0 allows that). The drawing scales to fit inside whatever box results. */
 .headstock { flex: 0 1 18rem; min-height: 0; width: 100%; max-width: 20rem; margin: 0 auto; }
-.headstock-body { fill: var(--surface-color); stroke: var(--muted-text-color); stroke-width: 2; }
-.headstock-nut { fill: var(--muted-text-color); }
+.headstock-body { fill: var(--headstock-color); stroke: var(--headstock-edge-color); stroke-width: 2; }
+.headstock-nut { fill: var(--nut-color); }
 
-.guitar-string { stroke: var(--muted-text-color); stroke-width: 1.5; }
+.guitar-string { stroke: var(--string-color); stroke-width: 1.5; }
 .guitar-string.active { stroke: var(--out-of-tune-color); stroke-width: 2.5; }
 .guitar-string.active.in-tune { stroke: var(--in-tune-color); }
 /* Very fast, tiny sideways shake imitates a vibrating string. */
@@ -102,9 +177,9 @@ h1 { margin: 0.5rem 0 0; }
 }
 
 .peg-shaft { stroke: var(--muted-text-color); stroke-width: 4; stroke-linecap: round; }
-.peg-knob { fill: var(--background-color); stroke: var(--muted-text-color); stroke-width: 2; }
+.peg-knob { fill: var(--wood-dark-color); stroke: var(--muted-text-color); stroke-width: 2; }
 .peg-tab { fill: var(--muted-text-color); }
-.peg-label { fill: var(--muted-text-color); font-size: 10px; font-weight: bold; text-anchor: middle; }
+.peg-label { fill: var(--muted-text-color); font-size: 12px; font-weight: bold; text-anchor: middle; }
 .peg.active .peg-knob { stroke: var(--out-of-tune-color); }
 .peg.active.in-tune .peg-knob { stroke: var(--in-tune-color); }
 .peg.active .peg-label, .peg.active .peg-tab { fill: var(--text-color); }
@@ -117,7 +192,7 @@ h1 { margin: 0.5rem 0 0; }
 
 /* The arrow is drawn clockwise in tuner.js and mirrored here for counterclockwise turns. */
 .peg-arrow { opacity: 0; color: var(--accent-color); transition: opacity 0.15s; }
-.peg-arrow-line { fill: none; stroke: currentColor; stroke-width: 3; stroke-linecap: round; }
+.peg-arrow-line { fill: none; stroke: currentColor; stroke-width: 4.5; stroke-linecap: round; }
 .peg-arrow-head { fill: currentColor; }
 .peg.turn-clockwise .peg-arrow,
 .peg.turn-counterclockwise .peg-arrow { opacity: 1; }
@@ -158,9 +233,13 @@ h1 { margin: 0.5rem 0 0; }
   background: var(--surface-color);
   border-radius: 6px;
   /* Tall enough (about 44px) to tap comfortably; the border is reserved so locking does not shift the layout. */
-  padding: 0.7rem 0.6rem;
+  padding: 0.7rem 0;
   border: 2px solid transparent;
-  min-width: 2.2rem;
+  /* The six chips share the row equally, so they shrink on narrow phones instead of
+     overflowing, and are capped (3.6rem) so they do not stretch on wide screens. */
+  flex: 1 1 0;
+  min-width: 0;
+  max-width: 3.6rem;
   color: var(--muted-text-color);
   cursor: pointer;
 }
@@ -178,7 +257,12 @@ h1 { margin: 0.5rem 0 0; }
   gap: 0.6rem;
   margin-top: 0.5rem;
 }
-.tuning-label { color: var(--muted-text-color); }
+/* The label and the button keep their size; the select (whose natural width is set by its
+   longest option, "Half step down") shrinks instead, so the row fits 320px phones. */
+.tuning-label, .controls button { flex: none; }
+.tuning-label { color: var(--text-color); }
+/* Hides keyboard-focus outlines only for mouse/touch clicks, keeping them for keyboard users. */
+.string-list li:focus:not(:focus-visible) { outline: none; }
 /* 16px text keeps iOS Safari from zooming the page when the select is tapped. */
 select {
   background: var(--surface-color);
@@ -187,14 +271,30 @@ select {
   border-radius: 6px;
   padding: 0.7rem 0.6rem;
   font-size: 1rem;
+  min-width: 0;
 }
 
+/* The open dropdown list ignores the translucent select background in some browsers. */
+select option { background: var(--wood-dark-color); color: var(--text-color); }
+
+/* Buttons look like raised keys: white with the chips' dark translucent text colour, a faint
+   top-to-bottom shading, a solid darker edge below (thickness) and a soft shadow (height). */
 button {
-  background: var(--accent-color);
-  color: white;
+  background: linear-gradient(var(--button-top-color), var(--button-bottom-color));
+  color: var(--surface-color);
   border: none;
   border-radius: 6px;
   padding: 0.7rem 2rem;
   font-size: 1.1rem;
+  font-weight: 600;
   cursor: pointer;
+  box-shadow: 0 4px 0 var(--button-edge-color), 0 6px 10px rgba(0, 0, 0, 0.45);
+  transition: transform 0.06s, box-shadow 0.06s;
+}
+/* Pressed: the button sinks into its edge, the shadow shrinks and the top turns slightly concave. */
+button:active {
+  transform: translateY(3px);
+  background: var(--button-bottom-color);
+  box-shadow: 0 1px 0 var(--button-edge-color), 0 2px 4px rgba(0, 0, 0, 0.35),
+    inset 0 2px 5px rgba(0, 0, 0, 0.25);
 }

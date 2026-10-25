@@ -9,6 +9,15 @@
 </head>
 <body>
   <main>
+    <!-- Opens the settings dialog below. Positioned in the corner so it takes no vertical space. -->
+    <button id="settings-button" class="settings-button" type="button" aria-label="Settings">
+      <!-- Gear icon: a dashed thick ring forms the teeth, so no icon file or font is needed. -->
+      <svg viewBox="0 0 24 24" width="24" height="24" aria-hidden="true" fill="none" stroke="currentColor">
+        <circle cx="12" cy="12" r="8.6" stroke-width="3.2" stroke-dasharray="3.4 3.4"/>
+        <circle cx="12" cy="12" r="6.2" stroke-width="2.4"/>
+        <circle cx="12" cy="12" r="2.2" stroke-width="2"/>
+      </svg>
+    </button>
     <h1>Guitar Tuner</h1>
     <!-- Instructions and live feedback (e.g. flat/sharp, errors); filled in by tuner.js. -->
     <p id="status" class="status">Press Start and play a string.</p>
@@ -45,6 +54,40 @@
     <!-- Which way to turn the active peg; filled in by tuner.js. -->
     <p id="turn-hint" class="turn-hint" aria-live="polite"></p>
   </main>
+
+  <!-- Settings. The content sits in an inner div so a click on the dialog itself means "outside". -->
+  <dialog id="settings-dialog" class="settings-dialog" aria-labelledby="settings-title">
+    <div class="settings-content">
+      <h2 id="settings-title">Settings</h2>
+
+      <label class="setting-row">
+        <input type="checkbox" id="high-accuracy-toggle">
+        <span>High accuracy mode</span>
+      </label>
+      <p class="settings-warning">
+        Warning: this listens to a longer slice of sound (about 170 ms instead of 85 ms).
+        It is more precise, especially for the low strings, but uses about 4&times; more
+        processing power and battery, reacts a little slower, and may stutter on older phones.
+      </p>
+
+      <h3>Keyboard shortcuts</h3>
+      <p>
+        Press <kbd>E</kbd> <kbd>A</kbd> <kbd>D</kbd> <kbd>G</kbd> or <kbd>B</kbd> to lock the
+        tuner to a string with that note. Press the same key again for the next string with
+        the same note (E: low E, then high E), and once more to go back to automatic mode.
+        This works with any keyboard language.
+      </p>
+
+      <h3>Feedback</h3>
+      <p>
+        Found a bug or have an idea?
+        <a href="https://github.com/ori-titan/guitar-tuner/issues/new" target="_blank" rel="noopener noreferrer">Send feedback or suggestions on GitHub</a>
+        (a free GitHub account is needed to post).
+      </p>
+
+      <button id="settings-close" type="button">Close</button>
+    </div>
+  </dialog>
 
   <script src="tuner.js"></script>
 </body>
